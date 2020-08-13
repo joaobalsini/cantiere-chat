@@ -1,9 +1,21 @@
-<section class="phx-hero">
-  <h1><%= gettext "Welcome to %{name}!", name: "Cantiere Chat" %></h1>
-  <p>Demonstration of Phoenix and Phoenix Live view</p>
+<%= if @live_action == :chat do %>
+  <h1> Chat </h1>
+  <%= for %{ user: user, message: message } <- @messages do %>
+    <p><strong><%= user %></strong> <%= message %></p>
+  <% end %>
 
-  <form phx-submit="join">
-    <input type="text" name="user_name" value="<%= @user_name %>" placeholder="Type your name and enter the chat"/>
-    <button type="submit" phx-disable-with="Joining the chat...">Join the chat</button>
+  <form phx-submit="send">
+      <input type="text" name="message" value="<%= @message %>" placeholder="Type your message"/>
+      <button type="submit" phx-disable-with="Sending the message...">Send</button>
   </form>
-</section>
+<% else %>
+  <section class="phx-hero">
+    <h1><%= gettext "Welcome to %{name}!", name: "Cantiere Chat" %></h1>
+    <p>Demonstration of Phoenix and Phoenix Live view</p>
+
+    <form phx-submit="join">
+      <input type="text" name="user_name" value="<%= @user_name %>" placeholder="Type your name and enter the chat"/>
+      <button type="submit" phx-disable-with="Joining the chat...">Join the chat</button>
+    </form>
+  </section>
+<% end %>

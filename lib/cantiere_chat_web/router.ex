@@ -18,6 +18,7 @@ defmodule CantiereChatWeb.Router do
     pipe_through :browser
 
     live "/", PageLive, :index
+    live "/chat", PageLive, :chat
   end
 
   # Other scopes may use custom stacks.
