@@ -1,8 +1,10 @@
 defmodule CantiereChatWeb.PageLive do
   use CantiereChatWeb, :live_view
+  @pubsub_topic "chat"
 
   @impl true
   def mount(_params, _session, socket) do
+    CantiereChatWeb.Endpoint.subscribe(@pubsub_topic)
     {:ok, socket}
   end
 
@@ -23,6 +25,10 @@ defmodule CantiereChatWeb.PageLive do
 
     messages = List.insert_at(socket.assigns.messages, -1, new_message)
 
+    CantiereChatWeb.Endpoint.broadcast_from(self(), @pubsub_topic, "message", %{
+      message: new_message
+    })
+
     {:noreply,
      socket
      |> assign(message: "", messages: messages)}
@@ -32,6 +38,15 @@ defmodule CantiereChatWeb.PageLive do
   def handle_params(params, _url, socket) do
     live_action = socket.assigns.live_action
     {:noreply, apply_action(socket, live_action, params)}
+  end
+
+  @impl true
+  def handle_info(%{event: "message", payload: %{message: new_message}}, socket) do
+    messages = List.insert_at(socket.assigns.messages, -1, new_message)
+
+    {:noreply,
+     socket
+     |> assign(messages: messages)}
   end
 
   def apply_action(socket, :chat, %{"user_name" => ""}), do: redirect_back(socket)
