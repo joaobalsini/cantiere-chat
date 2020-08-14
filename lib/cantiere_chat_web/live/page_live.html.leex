@@ -1,7 +1,14 @@
 <%= if @live_action == :chat do %>
+  <p><strong>Users:</strong> <%= Enum.join(@users, ", ") %>.</p>
+
   <h1> Chat </h1>
-  <%= for %{ user: user, message: message } <- @messages do %>
-    <p><strong><%= user %></strong> <%= message %></p>
+  <%= for %{ type: type, user: user, message: message } <- @messages do %>
+    <%= case type do %>
+      <% :message -> %>
+        <p><strong><%= user %></strong> <%= message %></p>
+      <% _other -> %>
+        <p style="color:red;"><%= message %></p>
+    <% end %>
   <% end %>
 
   <form phx-submit="send">

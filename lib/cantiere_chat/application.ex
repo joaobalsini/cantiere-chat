@@ -12,9 +12,10 @@ defmodule CantiereChat.Application do
       # Start the PubSub system
       {Phoenix.PubSub, name: CantiereChat.PubSub},
       # Start the Endpoint (http/https)
-      CantiereChatWeb.Endpoint
+      CantiereChatWeb.Endpoint,
       # Start a worker by calling: CantiereChat.Worker.start_link(arg)
       # {CantiereChat.Worker, arg}
+      CantiereChatWeb.Presence
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
