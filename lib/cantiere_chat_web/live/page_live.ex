@@ -32,14 +32,23 @@ defmodule CantiereChatWeb.PageLive do
 
     {:noreply,
      socket
-     |> assign(message: "", messages: messages)}
+     |> assign(:message, "")
+     |> assign(:messages, messages)
+     # When user sends a message notify all users and stop the timer
+     |> notify_users_that_stopped_typing()}
   end
+
+  @impl true
+  def handle_event("keyup", %{"key" => _any}, socket),
+    do: {:noreply, notify_users_that_started_typing(socket)}
 
   @impl true
   def handle_params(params, _url, socket) do
     live_action = socket.assigns.live_action
     {:noreply, apply_action(socket, live_action, params)}
   end
+
+  def handle_info(_any, %{assigns: %{live_action: :index}} = socket), do: {:noreply, socket}
 
   @impl true
   def handle_info(%{event: "message", payload: %{message: new_message}}, socket) do
@@ -52,23 +61,50 @@ defmodule CantiereChatWeb.PageLive do
 
   def handle_info(%{event: "presence_diff", payload: %{joins: joins, leaves: leaves}}, socket) do
     user_name = socket.assigns.user_name
-    live_action = socket.assigns.live_action
 
-    case live_action do
-      :index ->
-        {:noreply, socket}
+    messages =
+      socket.assigns.messages
+      |> process_joins_and_leaves(user_name, joins, leaves)
 
-      :chat ->
-        messages =
-          socket.assigns.messages
-          |> process_joins_and_leaves(user_name, joins, leaves)
+    users =
+      Presence.list(@pubsub_topic)
+      |> Enum.map(fn {user_name, _data} -> user_name end)
 
-        users =
-          Presence.list(@pubsub_topic)
-          |> Enum.map(fn {user_name, _data} -> user_name end)
+    current_users_status = socket.assigns.users_statuses
 
-        {:noreply, assign(socket, users: users, messages: messages)}
-    end
+    users_statuses =
+      Enum.reduce(users, %{}, fn user_name, acc ->
+        # If someone is typing during the presence_diff event we won't change that
+        Map.put(acc, user_name, Map.get(current_users_status, user_name, :idle))
+      end)
+
+    {:noreply,
+     socket
+     |> assign(:users, users)
+     |> assign(:users_statuses, users_statuses)
+     |> assign(:messages, messages)}
+  end
+
+  @impl true
+  def handle_info(%{event: "started_typing", payload: %{user_name: user_name}}, socket) do
+    updated_users_statuses =
+      socket.assigns.users_statuses
+      |> Map.put(user_name, :typing)
+
+    {:noreply, assign(socket, :users_statuses, updated_users_statuses)}
+  end
+
+  @impl true
+  def handle_info(:stopped_typing_timer, socket),
+    do: {:noreply, notify_users_that_stopped_typing(socket)}
+
+  @impl true
+  def handle_info(%{event: "stopped_typing", payload: %{user_name: user_name}}, socket) do
+    updated_users_statuses =
+      socket.assigns.users_statuses
+      |> Map.put(user_name, :idle)
+
+    {:noreply, assign(socket, :users_statuses, updated_users_statuses)}
   end
 
   def apply_action(socket, :chat, %{"user_name" => ""}), do: redirect_back(socket)
@@ -88,6 +124,7 @@ defmodule CantiereChatWeb.PageLive do
     |> assign(messages: [])
     |> assign(message: "")
     |> assign(users: [])
+    |> assign(users_statuses: %{})
   end
 
   def apply_action(socket, :chat, _other), do: redirect_back(socket)
@@ -122,5 +159,51 @@ defmodule CantiereChatWeb.PageLive do
       end)
 
     Enum.reverse(messages)
+  end
+
+  defp render_users_with_statuses(users, users_statuses) do
+    Enum.map(users, fn user ->
+      case Map.get(users_statuses, user) do
+        :idle -> user
+        :typing -> "#{user}(typing)"
+      end
+    end)
+    |> Enum.join(", ")
+  end
+
+  defp stop_typing_timer(%{assigns: %{typing_timer: timer}} = socket)
+       when not is_nil(timer) do
+    # if the timer is already stopped it will return false, but won't raise any error
+    Process.cancel_timer(timer)
+    assign(socket, :typing_timer, nil)
+  end
+
+  defp stop_typing_timer(socket), do: socket
+
+  defp restart_typing_timer(socket) do
+    socket
+    |> stop_typing_timer()
+    |> assign(:typing_timer, Process.send_after(self(), :stopped_typing_timer, 5_000))
+  end
+
+  defp notify_users_that_started_typing(socket) do
+    user_name = socket.assigns.user_name
+
+    CantiereChatWeb.Endpoint.broadcast_from(self(), @pubsub_topic, "started_typing", %{
+      user_name: user_name
+    })
+
+    restart_typing_timer(socket)
+  end
+
+  defp notify_users_that_stopped_typing(socket) do
+    user_name = socket.assigns.user_name
+
+    CantiereChatWeb.Endpoint.broadcast_from(self(), @pubsub_topic, "stopped_typing", %{
+      user_name: user_name
+    })
+
+    # Even if the timer is stopped, we will unassign here the type_timer variable
+    stop_typing_timer(socket)
   end
 end

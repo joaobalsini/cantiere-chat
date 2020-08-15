@@ -1,5 +1,5 @@
 <%= if @live_action == :chat do %>
-  <p><strong>Users:</strong> <%= Enum.join(@users, ", ") %>.</p>
+  <p><strong>Users:</strong> <%= render_users_with_statuses(@users, @users_statuses) %>.</p>
 
   <h1> Chat </h1>
   <%= for %{ type: type, user: user, message: message } <- @messages do %>
@@ -12,7 +12,7 @@
   <% end %>
 
   <form phx-submit="send">
-      <input type="text" name="message" value="<%= @message %>" placeholder="Type your message"/>
+      <input phx-keyup="keyup" type="text" name="message" value="<%= @message %>" placeholder="Type your message"/>
       <button type="submit" phx-disable-with="Sending the message...">Send</button>
   </form>
 <% else %>
