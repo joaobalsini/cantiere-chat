@@ -6,7 +6,7 @@ defmodule CantiereChatWeb.PageLive do
   @impl true
   def mount(_params, _session, socket) do
     CantiereChatWeb.Endpoint.subscribe(@pubsub_topic)
-    {:ok, socket}
+    {:ok, socket, temporary_assigns: [messages: []]}
   end
 
   @impl true
@@ -22,7 +22,13 @@ defmodule CantiereChatWeb.PageLive do
   @impl true
   def handle_event("send", %{"message" => message}, socket) do
     user_name = socket.assigns.user_name
-    new_message = %{type: :message, user: user_name, message: message}
+
+    new_message = %{
+      id: System.unique_integer([:positive]),
+      type: :message,
+      user: user_name,
+      message: message
+    }
 
     messages = List.insert_at(socket.assigns.messages, -1, new_message)
 
@@ -148,13 +154,25 @@ defmodule CantiereChatWeb.PageLive do
 
     messages =
       Enum.reduce(joins, messages, fn {user_name, _data}, _acc ->
-        new_message = %{type: :enter, user: user_name, message: "#{user_name} entered the chat."}
+        new_message = %{
+          id: System.unique_integer([:positive]),
+          type: :enter,
+          user: user_name,
+          message: "#{user_name} entered the chat."
+        }
+
         [new_message | messages]
       end)
 
     messages =
       Enum.reduce(leaves, messages, fn {user_name, _data}, _acc ->
-        new_message = %{type: :enter, user: user_name, message: "#{user_name} left the chat."}
+        new_message = %{
+          id: System.unique_integer([:positive]),
+          type: :leave,
+          user: user_name,
+          message: "#{user_name} left the chat."
+        }
+
         [new_message | messages]
       end)
 
